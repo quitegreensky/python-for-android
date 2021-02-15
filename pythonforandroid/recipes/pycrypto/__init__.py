@@ -5,18 +5,20 @@ from pythonforandroid.toolchain import (
     shprint,
 )
 import sh
+import re#
 
 
 class PyCryptoRecipe(CompiledComponentsPythonRecipe):
     version = '2.7a1'
     url = 'https://github.com/dlitz/pycrypto/archive/v{version}.zip'
-    depends = ['openssl', 'python3']
+    depends = ['openssl', ('python2', 'python3')]
     site_packages_name = 'Crypto'
     call_hostpython_via_targetpython = False
     patches = ['add_length.patch']
 
-    def get_recipe_env(self, arch=None):
-        env = super().get_recipe_env(arch)
+    def get_recipe_env(self, arch=None, with_flags_in_cc=True):#
+        #env = super(PyCryptoRecipe, self).get_recipe_env(arch)
+        env = super().get_recipe_env(arch, with_flags_in_cc)
         openssl_recipe = Recipe.get_recipe('openssl', self.ctx)
         env['CC'] = env['CC'] + openssl_recipe.include_flags(arch)
 
@@ -24,7 +26,9 @@ class PyCryptoRecipe(CompiledComponentsPythonRecipe):
         env['LDFLAGS'] += ' -L{}'.format(self.ctx.libs_dir)
         env['LDFLAGS'] += openssl_recipe.link_dirs_flags(arch)
         env['LIBS'] = env.get('LIBS', '') + openssl_recipe.link_libs_flags()
-
+        regex = re.compile(r'(?:\s|^)-[DI][\S]+')#
+        env['LIBS'] += ' {}'.format(''.join(re.findall(regex, env['LDLIBS'])).strip())#
+        env['LIBS'] += '-lm'
         env['EXTRA_CFLAGS'] = '--host linux-armv'
         env['ac_cv_func_malloc_0_nonnull'] = 'yes'
         return env
@@ -38,7 +42,7 @@ class PyCryptoRecipe(CompiledComponentsPythonRecipe):
             shprint(configure, '--host=arm-eabi',
                     '--prefix={}'.format(self.ctx.get_python_install_dir()),
                     '--enable-shared', _env=env)
-        super().build_compiled_components(arch)
+        super(PyCryptoRecipe, self).build_compiled_components(arch)
 
 
 recipe = PyCryptoRecipe()
